@@ -7,9 +7,11 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use App\Models\CcCalls;
+use App\Models\DigiplusTickets;
 use Illuminate\Support\Facades\Log;
 use Exception;
 use App\Models\Common;
+use DateTime;
 
 class ReportController extends Controller
 {
@@ -43,24 +45,49 @@ class ReportController extends Controller
                 continue;
             }
 
-            Log::info('Row: ' . $rowNumber + 1);
+            Log::info('Row: ' . ($rowNumber + 1));
 
-            $fallbackDate = $spreadsheet->getActiveSheet()->getCell('J' . $rowNumber + 1)->getFormattedValue();
+            /*$fallbackDate = $spreadsheet->getActiveSheet()->getCell('J' . $rowNumber + 1)->getFormattedValue();*/
             // Get the correctly formatted date based on dates received in different formats
-            $startDate = Common::getFormattedDate($spreadsheet->getActiveSheet()->getCell('L' . $rowNumber + 1)->getFormattedValue(), $fallbackDate);
-            $finishDate = Common::getFormattedDate($spreadsheet->getActiveSheet()->getCell('M' . $rowNumber + 1)->getFormattedValue(), $fallbackDate);
+            $createdOn = Common::getFormattedDate($spreadsheet->getActiveSheet()->getCell('B' . ($rowNumber + 1))->getFormattedValue());
+            $mondifiedOn = Common::getFormattedDate($spreadsheet->getActiveSheet()->getCell('O' . ($rowNumber + 1))->getFormattedValue());
+            //$pivotDate = date('M d', strtotime($createdOn));
+            $pivotDate = new DateTime($createdOn);
+            $createdBy = $spreadsheet->getActiveSheet()->getCell('M' .($rowNumber + 1))->getValue();
+            $modifiedBy = $spreadsheet->getActiveSheet()->getCell('N' . ($rowNumber + 1))->getValue();
+            $status = $spreadsheet->getActiveSheet()->getCell('G' . ($rowNumber + 1))->getValue();
 
-           try
-           {
+            $tierFilter = Common::getTierFilter($createdBy, $modifiedBy, $status);
+            $resolutionTime = Common::getResolutionTime($request->input('date',date('Y-m-d H:i:s')), $tierFilter, $createdOn, $mondifiedOn);
+            $sla = Common::getSla($resolutionTime);
+
+            try
+            {
                // Attempt to save the row to the database
-               $created = CcCalls::create([
-                    'account_number' => $spreadsheet->getActiveSheet()->getCell('A' . $rowNumber + 1)->getValue(),
-                    'customer_name' => $spreadsheet->getActiveSheet()->getCell('B' . $rowNumber + 1)->getValue(),
-                    'job_number' => $spreadsheet->getActiveSheet()->getCell('D' . $rowNumber + 1)->getValue(),
-                    'date_started' => $startDate,
-                    'date_finished' => $finishDate,
-                    'engineer' => $spreadsheet->getActiveSheet()->getCell('P' . $rowNumber + 1)->getValue(),
-                    'created_by' => $spreadsheet->getActiveSheet()->getCell('T' . $rowNumber + 1)->getValue(),
+               $created = DigiplusTickets::create([
+
+                'case_number' => $spreadsheet->getActiveSheet()->getCell('A' . ($rowNumber + 1))->getValue(),
+                'created_on' => $createdOn,
+                'case_type'=> $spreadsheet->getActiveSheet()->getCell('C' . ($rowNumber + 1))->getValue(),
+                'case_category' => $spreadsheet->getActiveSheet()->getCell('D' . ($rowNumber + 1))->getValue(),
+                'case_sub_category' => $spreadsheet->getActiveSheet()->getCell('E' . ($rowNumber + 1))->getValue(),
+                'description' => $spreadsheet->getActiveSheet()->getCell('F' . ($rowNumber + 1))->getValue(),
+                'status' => $spreadsheet->getActiveSheet()->getCell('G' . ($rowNumber + 1))->getValue(),
+                'account_number' => $spreadsheet->getActiveSheet()->getCell('H' . ($rowNumber + 1))->getValue(),
+                'customer_type' => $spreadsheet->getActiveSheet()->getCell('I' . ($rowNumber + 1))->getValue(),
+                'customer_name' => $spreadsheet->getActiveSheet()->getCell('J' .($rowNumber + 1))->getValue(),
+                'primary_mobile_number' => $spreadsheet->getActiveSheet()->getCell('K' . ($rowNumber + 1))->getValue(),
+                'city' => $spreadsheet->getActiveSheet()->getCell('L' . ($rowNumber + 1))->getValue(),
+                'created_by' => $spreadsheet->getActiveSheet()->getCell('M' . ($rowNumber + 1))->getValue(),
+                'modified_by' => $spreadsheet->getActiveSheet()->getCell('N' . ($rowNumber + 1))->getValue(),
+                'modified_on' => $mondifiedOn,
+                'case_title' => $spreadsheet->getActiveSheet()->getCell('P' . ($rowNumber + 1))->getValue(),
+                'pivot_date_created' => $pivotDate->format('M d'),
+                'tier_filter' => $tierFilter,
+                'resolution_time' => $resolutionTime,
+                'sla' => $sla,
+                'week' => $pivotDate->format('W'),
+                'escalation_team' => $spreadsheet->getActiveSheet()->getCell('V' . ($rowNumber + 1))->getValue(),
                 ]);
             }
             catch(Exception $e){

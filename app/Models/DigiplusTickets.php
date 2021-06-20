@@ -24,6 +24,7 @@ class DigiplusTickets extends Model
         'status',
         'account_number',
         'customer_type',
+        'customer_name',
         'primary_mobile_number',
         'city',
         'created_by',

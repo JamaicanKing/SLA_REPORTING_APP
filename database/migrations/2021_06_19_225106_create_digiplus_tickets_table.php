@@ -24,6 +24,7 @@ class CreateDigiplusTicketsTable extends Migration
             $table->string('status');
             $table->bigInteger('account_number');
             $table->string('customer_type');
+            $table->string('customer_name');
             $table->bigInteger('primary_mobile_number');
             $table->string('city');
             $table->string('created_by');
