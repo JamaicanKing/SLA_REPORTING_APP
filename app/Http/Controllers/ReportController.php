@@ -11,7 +11,9 @@ use App\Models\DigiplusTickets;
 use Illuminate\Support\Facades\Log;
 use Exception;
 use App\Models\Common;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use DateTime;
+use PhpParser\Node\Stmt\Foreach_;
 
 class ReportController extends Controller
 {
@@ -22,6 +24,8 @@ class ReportController extends Controller
      */
     public function store(Request $request)
     {
+        set_time_limit(900);
+
         // Get file from form request
         $file = $request->file('file');
         
@@ -108,7 +112,7 @@ class ReportController extends Controller
             // Limit the amount of rows processed for testing purposes
             // This should be removed when testing is finished
             if($rowNumber > 15){
-                break;
+               // break;
             }
         }
 
@@ -122,24 +126,68 @@ class ReportController extends Controller
 
     public function write(Request $request)
     {
-        $persons = CcCalls::all();
+        $createdOn1 = $request->input('createdOn1');
+        $createdOn2 = $request->input('createdOn2');
+        $columnIndex = 2;
+        
+        $reportDetails = DigiplusTickets::getReportDetails($createdOn1,$createdOn2);
         
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setCellValue('A1', 'Account Number');
-        $sheet->setCellValue('B1', 'Job Number');
-        $sheet->setCellValue('C1', 'Date Finished');
-        $sheet->setCellValue('D1', 'Engineer');
+        $sheet->setCellValue('A1', 'SLA');
+        $sheet->setCellValue('B1', 'Created On');
+        $sheet->setCellValue('C1', 'Case Count');
 
-        $dataRow = 2;
-        foreach($persons as $person){
-            $sheet->setCellValue('A' . $dataRow, $person->account_number);
-            $sheet->setCellValue('B' . $dataRow, $person->job_number);
-            $sheet->setCellValue('C' . $dataRow, $person->date_finished);
-            $sheet->setCellValue('D' . $dataRow, $person->engineer);
+        
 
-            $dataRow++;
+        $data = [];
+        
+        foreach($reportDetails as $reportDetail){
+          
+            $data[$reportDetail->created_on][$reportDetail->sla] = $reportDetail->case_count;
+            
         }
+
+        $slaExcelData = [];
+        $maxRowNum = 1;
+
+        foreach ($data as $date => $slaList) {
+
+            $rowNum = 2;
+            $column = Coordinate::stringFromColumnIndex($columnIndex);
+            $cell = $column . '1';
+            $sheet->setCellValue($cell, $date);
+
+            foreach ($slaList as $sla => $caseCount) {
+
+                if(isset($slaExcelData[$sla]) === false ){
+
+                    if(count($slaExcelData) > 0){
+                        foreach($slaExcelData as $excelData){
+                            $maxRowNum = ($excelData['row'] > $maxRowNum) ? $excelData['row'] : $maxRowNum;
+                        }
+                    }
+                    $maxRowNum = $maxRowNum + 1;
+
+                    $slaExcelData[$sla] = [
+                        'row' => $maxRowNum,
+                        'cell' =>"A" . $maxRowNum,
+                    ];
+
+                }
+                
+                $dataCell = $column . "" . $slaExcelData[$sla]['row'];
+                $sheet->setCellValue($slaExcelData[$sla]['cell'],$sla);
+                $sheet->setCellValue("$dataCell",$caseCount);
+
+                
+                $rowNum++;
+                
+            }
+
+            $columnIndex++;
+        }
+
 
         $filePath = storage_path() . '\hello world.xlsx';
 
@@ -158,5 +206,10 @@ class ReportController extends Controller
             'Content-Type' => 'application/vnd.ms-excel',
             'Content-Disposition' => 'inline; filename="' . $filename . '"'
         ]);
+    }
+
+    public function show(){
+        
+        return view('sla');
     }
 }

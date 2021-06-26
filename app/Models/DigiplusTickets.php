@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Exception;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class DigiplusTickets extends Model
 {
@@ -38,4 +41,28 @@ class DigiplusTickets extends Model
         'week',
         'escalation_team',
     ];
+
+    public static function getReportDetails($createdOn1, $createdOn2){
+        try{
+            $reportDetails = DB::select("SELECT 
+                                        DATE(created_on) as created_on,
+                                        COUNT(sla) as case_count,
+                                        sla
+                                        FROM `digiplus_tickets` 
+                                        WHERE created_on BETWEEN '$createdOn1' AND '$createdOn2'
+                                        Group BY DATE(created_on), sla
+                                        ");
+        
+            if($reportDetails){
+                return $reportDetails;
+            }
+        }
+        catch(Exception $error){
+            Log::error("Error trying to get Reports by dates created: " . $error->getMessage());
+        }
+
+        return [];
+
+
+    }
 }

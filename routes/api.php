@@ -19,4 +19,4 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 });
 
 Route::post('report/import', ['App\Http\Controllers\ReportController', 'store'])->name('api.report.import');
-Route::get('report/write', ['App\Http\Controllers\ReportController', 'write']);
+Route::get('report/write', ['App\Http\Controllers\ReportController', 'write'])->name('api.report.write');
